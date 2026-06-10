@@ -1,0 +1,53 @@
+{
+  "active_profile": "default",
+  "profiles": {
+    "default": {
+      "description": "Balanced across all three factors — good for general conversations",
+      "weights": {
+        "token_pressure": 40,
+        "semantic_drift": 35,
+        "redundancy":     25
+      },
+      "thresholds": {
+        "warn": 70,
+        "red":  50
+      }
+    },
+    "technical": {
+      "description": "For coding and debugging sessions — token pressure weighted higher, drift less important",
+      "weights": {
+        "token_pressure": 50,
+        "semantic_drift": 20,
+        "redundancy":     30
+      },
+      "thresholds": {
+        "warn": 75,
+        "red":  55
+      }
+    },
+    "creative": {
+      "description": "For brainstorming and writing — topic drift is expected, redundancy is the main signal",
+      "weights": {
+        "token_pressure": 25,
+        "semantic_drift": 50,
+        "redundancy":     25
+      },
+      "thresholds": {
+        "warn": 65,
+        "red":  40
+      }
+    },
+    "strict": {
+      "description": "For research and long documents — tighter thresholds, earlier warnings",
+      "weights": {
+        "token_pressure": 35,
+        "semantic_drift": 35,
+        "redundancy":     30
+      },
+      "thresholds": {
+        "warn": 80,
+        "red":  60
+      }
+    }
+  }
+}

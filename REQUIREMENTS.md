@@ -64,11 +64,94 @@ Both Claude (200k token window) and ChatGPT (128k token window) silently degrade
 
 **Score Formula:**
 ```
-Score = 100
-  - Token Pressure   : (tokens_used / context_window) × 40
-  - Semantic Drift   : cosine_distance(current_embedding, origin_embedding) × 35
-  - Redundancy Ratio : (repeated_content_ratio) × 25
+Score = 100 − token_penalty − drift_penalty − redundancy_penalty
+
+token_penalty     = (tokens_used / context_window)          × weight_token_pressure   [default 40]
+drift_penalty     = cosine_distance(origin_emb, latest_emb) × weight_semantic_drift   [default 35]
+redundancy_penalty= avg_word_overlap(last 4 messages)        × weight_redundancy       [default 25]
 ```
+
+**Factor Breakdown:**
+
+| Factor | Max Penalty | How It's Measured | What Triggers It |
+|---|---|---|---|
+| Token Pressure | 40 pts | `tokens_used / 200,000 × 40` | Context window filling up |
+| Semantic Drift | 35 pts | Cosine distance between first & latest user message embeddings (`all-MiniLM-L6-v2`) | Topic changed significantly |
+| Redundancy | 25 pts | Average word-overlap ratio across last 4 messages | Going in circles |
+
+**Status Bands (configurable thresholds):**
+
+| Score | Status | Signal |
+|---|---|---|
+| 80–100 | 🟢 Fresh | All good |
+| 50–79 | 🟡 Crowded | Hint: "Consider /carry soon" |
+| 0–49 | 🔴 Degraded | Warning: "Use /carry now" |
+
+**Real-world Score Progression Example:**
+
+| Message # | Token Penalty | Drift Penalty | Redundancy Penalty | Score |
+|---|---|---|---|---|
+| 5 | -2 | -0 | -0 | 98 🟢 |
+| 25 | -8 | -5 | -3 | 84 🟢 |
+| 60 | -18 | -12 | -8 | 62 🟡 |
+| 100 | -30 | -20 | -15 | 35 🔴 |
+
+---
+
+### R3-CONFIG — Score Configuration Mechanism
+
+**Goal:** Allow factor weights and thresholds to be adjusted at runtime without touching code — for testing, tuning, and personalisation.
+
+| # | Requirement | Priority |
+|---|---|---|
+| R3-C.1 | All score weights stored in `scoring_config.json` (editable file) | Must Have |
+| R3-C.2 | Weights must always sum to 100 — validation enforced on load | Must Have |
+| R3-C.3 | Status band thresholds (`warn`, `red`) configurable per profile | Must Have |
+| R3-C.4 | Named profiles supported (e.g. `default`, `technical`, `creative`, `strict`) | Must Have |
+| R3-C.5 | Active profile switchable via MCP tool `ck_set_profile` without restart | Must Have |
+| R3-C.6 | `reset` command restores factory defaults | Should Have |
+| R3-C.7 | Each profile change is logged with timestamp for audit trail | Nice to Have |
+
+**Config File Structure (`scoring_config.json`):**
+```json
+{
+  "active_profile": "default",
+  "profiles": {
+    "default": {
+      "weights": {
+        "token_pressure": 40,
+        "semantic_drift": 35,
+        "redundancy":     25
+      },
+      "thresholds": {
+        "warn": 70,
+        "red":  50
+      }
+    },
+    "technical": {
+      "weights": { "token_pressure": 50, "semantic_drift": 20, "redundancy": 30 },
+      "thresholds": { "warn": 75, "red": 55 }
+    },
+    "creative": {
+      "weights": { "token_pressure": 25, "semantic_drift": 50, "redundancy": 25 },
+      "thresholds": { "warn": 65, "red": 40 }
+    },
+    "strict": {
+      "weights": { "token_pressure": 35, "semantic_drift": 35, "redundancy": 30 },
+      "thresholds": { "warn": 80, "red": 60 }
+    }
+  }
+}
+```
+
+**Profile Use Cases:**
+
+| Profile | Best For | Why weights differ |
+|---|---|---|
+| `default` | General use | Balanced across all three factors |
+| `technical` | Coding / debugging sessions | Token pressure matters more; drift less (topic stays focused) |
+| `creative` | Brainstorming / writing | Drift is expected and OK; redundancy is the real warning sign |
+| `strict` | Research / long documents | Tighter thresholds, earlier warnings |
 
 ---
 
